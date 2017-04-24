@@ -16,18 +16,36 @@
 
 package io.vertx.servicediscovery.impl;
 
-import io.vertx.core.*;
+import io.vertx.core.AsyncResult;
+import io.vertx.core.CompositeFuture;
+import io.vertx.core.Future;
+import io.vertx.core.Handler;
+import io.vertx.core.Vertx;
 import io.vertx.core.impl.VertxInternal;
 import io.vertx.core.json.JsonObject;
 import io.vertx.core.logging.Logger;
 import io.vertx.core.logging.LoggerFactory;
-import io.vertx.servicediscovery.*;
+import io.vertx.servicediscovery.Record;
+import io.vertx.servicediscovery.ServiceDiscovery;
+import io.vertx.servicediscovery.ServiceDiscoveryOptions;
+import io.vertx.servicediscovery.ServiceReference;
+import io.vertx.servicediscovery.Status;
 import io.vertx.servicediscovery.spi.ServiceDiscoveryBackend;
 import io.vertx.servicediscovery.spi.ServiceExporter;
 import io.vertx.servicediscovery.spi.ServiceImporter;
 import io.vertx.servicediscovery.spi.ServicePublisher;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
+import java.util.Optional;
+import java.util.ServiceLoader;
+import java.util.Set;
 import java.util.concurrent.CopyOnWriteArraySet;
 import java.util.function.Function;
 import java.util.stream.Collectors;
@@ -317,32 +335,30 @@ public class DiscoveryImpl implements ServiceDiscovery, ServicePublisher {
     vertx.eventBus().publish(announce, announcedRecord.toJson());
   }
 
-  /*
-    @Override
-    public void publish(Record record, Handler<AsyncResult<Record>> resultHandler) {
-      Status status = record.getStatus() != null
-        && record.getStatus() != Status.UNKNOWN
-        && record.getStatus() != Status.DOWN
-        ? record.getStatus() : Status.UP;
+  public void publishFixed(Record record, Handler<AsyncResult<Record>> resultHandler) {
+    Status status = record.getStatus() != null
+      && record.getStatus() != Status.UNKNOWN
+      && record.getStatus() != Status.DOWN
+      ? record.getStatus() : Status.UP;
 
-      backend.store(record.setStatus(status), ar -> {
-        if (ar.failed()) {
-          resultHandler.handle(Future.failedFuture(ar.cause()));
-          return;
-        }
+    backend.store(record.setStatus(status), ar -> {
+      if (ar.failed()) {
+        resultHandler.handle(Future.failedFuture(ar.cause()));
+        return;
+      }
 
-        for (ServiceExporter exporter : exporters) {
-          exporter.onPublish(new Record(ar.result()));
-        }
-        Record announcedRecord = new Record(ar.result());
-        announcedRecord
-          .setRegistration(null)
-          .setStatus(status);
-        vertx.eventBus().publish(announce, announcedRecord.toJson());
-        resultHandler.handle(Future.succeededFuture(ar.result()));
-      });
-    }
-  */
+      for (ServiceExporter exporter : exporters) {
+        exporter.onPublish(new Record(ar.result()));
+      }
+      Record announcedRecord = new Record(ar.result());
+      announcedRecord
+        .setRegistration(null)
+        .setStatus(status);
+      vertx.eventBus().publish(announce, announcedRecord.toJson());
+      resultHandler.handle(Future.succeededFuture(ar.result()));
+    });
+  }
+
   @Override
   public void unpublish(String id, Handler<AsyncResult<Void>> resultHandler) {
     backend.remove(id, record -> {
